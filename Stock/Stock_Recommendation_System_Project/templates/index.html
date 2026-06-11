@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Stock AI Advisor | Bauhaus Edition</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a1a1a",
+                        "surface": "#ffffff",
+                        "surface-container": "#f4f4f4",
+                        "border-subtle": "#e5e5e5",
+                        "text-muted": "#666666",
+                        "accent-blue": "#0047AB",
+                        "accent-red": "#D1110B",
+                        "accent-yellow": "#FFD700"
+                    },
+                    fontFamily: {
+                        sans: ['Space Grotesk', 'sans-serif'],
+                    },
+                    borderRadius: {
+                        'bauhaus': '4px',
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            background-color: #ffffff;
+            color: #1a1a1a;
+            font-family: 'Space Grotesk', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .premium-card {
+            background-color: #ffffff;
+            border: 2px solid #1a1a1a;
+            border-radius: 4px;
+            box-shadow: 4px 4px 0px 0px #1a1a1a;
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+
+        .premium-card:hover {
+            transform: translate(-1px, -1px);
+            box-shadow: 5px 5px 0px 0px #1a1a1a;
+        }
+
+        .metric-val {
+            font-size: 2.25rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1;
+        }
+
+        .btn-premium {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-radius: 4px;
+            border: 2px solid #1a1a1a;
+            transition: all 0.2s ease;
+        }
+
+        .btn-premium:hover {
+            background-color: #ffffff;
+            color: #1a1a1a;
+        }
+
+        .input-premium {
+            background-color: #ffffff;
+            border: 2px solid #1a1a1a;
+            color: #1a1a1a;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .input-premium:focus {
+            border-color: #0047AB;
+            ring: 2px;
+            ring-color: #0047AB;
+            outline: none;
+        }
+
+        /* Custom Plotly Styling Override */
+        .js-plotly-plot .plotly .main-svg {
+            background: transparent !important;
+        }
+        
+        #actionBadge {
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+
+        .section-header {
+            border-bottom: 4px solid #1a1a1a;
+            display: inline-block;
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body class="min-h-screen px-4 py-12 md:px-8 lg:px-16">
+<div class="max-w-7xl mx-auto">
+<!-- Header Section -->
+<header class="mb-16">
+<h1 class="text-5xl md:text-6xl font-bold tracking-tighter text-primary mb-3 uppercase italic">
+            Stock AI Advisor
+        </h1>
+<div class="h-2 w-24 bg-accent-red mb-4"></div>
+<p class="text-text-muted text-lg font-medium border-l-4 border-accent-blue pl-4">
+            Real-time Market Analysis &amp; Smart Predictions
+        </p>
+</header>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+<!-- Control Sidebar Panel -->
+<div class="lg:col-span-4 space-y-8">
+<div class="premium-card p-8">
+<h4 class="text-sm font-bold uppercase tracking-widest text-primary mb-6 section-header">
+                    Select Asset
+                </h4>
+<form id="predictionForm">
+<div class="mb-6">
+<label class="block text-xs font-bold text-primary uppercase mb-2" for="tickerSelect">Target Ticker</label>
+<select class="input-premium w-full py-3 px-4 appearance-none cursor-pointer" id="tickerSelect" name="ticker">
+                            {% for ticker in tickers %}
+                            <option value="{{ ticker }}">{{ ticker }}</option>
+                            {% endfor %}
+                        </select>
+</div>
+<button class="btn-premium w-full py-4 text-sm" type="submit">Run Hybrid Inference</button>
+</form>
+</div>
+<!-- Validation/Metric Summary Card -->
+<div class="premium-card p-8 bg-surface-container border-dashed border-2">
+<h5 class="text-xs font-bold uppercase tracking-widest text-primary mb-6">Validation Performance</h5>
+<div class="space-y-4">
+<div class="flex justify-between items-center pb-2 border-b border-border-subtle">
+<span class="text-sm font-medium text-text-muted">RF Model RMSE</span>
+<span class="text-sm font-bold text-primary" id="rfRmse">—</span>
+</div>
+<div class="flex justify-between items-center pb-2 border-b border-border-subtle">
+<span class="text-sm font-medium text-text-muted">LSTM Network RMSE</span>
+<span class="text-sm font-bold text-primary" id="lstmsRmse">—</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Dashboard Outputs Workspace Panel -->
+<div class="lg:col-span-8">
+<div class="premium-card p-12 text-center text-text-muted border-dashed border-2 bg-surface-container flex flex-col items-center justify-center min-h-[300px]" id="welcomeMessage">
+<div class="w-12 h-12 bg-accent-yellow mb-4"></div>
+<p class="text-sm font-bold text-primary uppercase">Ready for Analysis</p>
+<p class="text-sm max-w-xs mt-2">Select an engineering asset parameter from the configuration pane to calculate validation inferences.</p>
+</div>
+<div class="hidden transition-opacity duration-300" id="dashboardResults">
+<!-- Advice Indicator Header -->
+<div class="premium-card p-10 mb-8 flex flex-col items-center justify-center text-center">
+<span class="text-xs font-bold uppercase tracking-widest text-text-muted mb-4">AI Recommendation</span>
+<div class="text-4xl font-black mb-6 px-10 py-4 border-4 border-primary" id="actionBadge">—</div>
+<p class="text-base text-primary font-medium max-w-lg leading-relaxed italic" id="logicText"></p>
+</div>
+<!-- Numerical Analysis Cards Row -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+<div class="premium-card p-6 flex flex-col justify-center border-t-8 border-t-primary">
+<span class="text-xs font-bold uppercase tracking-widest text-text-muted mb-2">Current Price</span>
+<div class="metric-val text-primary" id="currPrice">—</div>
+</div>
+<div class="premium-card p-6 flex flex-col justify-center border-t-8 border-t-accent-yellow">
+<span class="text-xs font-bold uppercase tracking-widest text-text-muted mb-2">RF Forecast</span>
+<div class="metric-val text-primary" id="rfPrice">—</div>
+</div>
+<div class="premium-card p-6 flex flex-col justify-center border-t-8 border-t-accent-blue">
+<span class="text-xs font-bold uppercase tracking-widest text-text-muted mb-2">AI Forecast</span>
+<div class="metric-val text-primary" id="lstmPrice">—</div>
+</div>
+</div>
+<!-- Plotly Visualization Wrapper -->
+<div id="plotlyChart"></div>
+
+<div id="plotlyChart" style="min-height: 450px; width: 100%;"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Core Asynchronous JavaScript Pipeline Engine -->
+<script>
+        document.getElementById('predictionForm').addEventListener('submit', async function (e) {
+            e.preventDefault();
+
+            const form = document.getElementById('predictionForm');
+            const formData = new FormData(form);
+
+            // UI Loading state transitions
+            const welcome = document.getElementById('welcomeMessage');
+            welcome.classList.add('hidden');
+            
+            const dash = document.getElementById('dashboardResults');
+            dash.classList.remove('hidden');
+            dash.style.opacity = '0.5';
+
+            try {
+                const response = await fetch('/predict', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                if (!response.ok) throw new Error(data.error || "Execution Pipeline Failure.");
+
+                // Inject computed text variables into the DOM
+                document.getElementById('currPrice').innerText = data.current_price;
+                document.getElementById('rfPrice').innerText = data.pred_rf;
+                document.getElementById('lstmPrice').innerText = data.pred_lstm;
+                document.getElementById('rfRmse').innerText = data.rf_rmse + " USD";
+                document.getElementById('lstmsRmse').innerText = data.lstm_rmse + " USD";
+                document.getElementById('logicText').innerText = data.logic_text;
+
+                // Structure system decision badges
+                const badge = document.getElementById('actionBadge');
+
+                let badgeColorClass = "";
+                let actionLabel = "";
+
+                // BAUHAUS THEME ADAPTATION: Bold borders and solid fills
+                if (data.action === "Strong Buy") {
+                    actionLabel = "Strong Buy";
+                    badgeColorClass = "bg-emerald-500 text-white border-primary";
+                }
+                else if (data.action === "Buy") {
+                    actionLabel = "Buy";
+                    badgeColorClass = "bg-emerald-100 text-emerald-900 border-primary";
+                }
+                else if (data.action === "Sell") {
+                    actionLabel = "Sell";
+                    badgeColorClass = "bg-red-500 text-white border-primary";
+                }
+                else {
+                    actionLabel = "Hold";
+                    badgeColorClass = "bg-white text-primary border-primary";
+                }
+
+                badge.innerHTML = actionLabel;
+                badge.className = `text-4xl font-black mb-6 px-10 py-4 border-4 transition-all ${badgeColorClass}`;
+
+                // Render technical chart indicators
+                const graphData = JSON.parse(data.graph);
+                
+                // Fine-tune plotly layout for BAUHAUS LIGHT theme
+                graphData.layout.paper_bgcolor = 'rgba(255,255,255,0)';
+                graphData.layout.plot_bgcolor = 'rgba(244,244,244,0.3)';
+                graphData.layout.font = { family: 'Space Grotesk', color: '#1a1a1a', size: 12 };
+                graphData.layout.margin = { t: 40, r: 20, l: 60, b: 60 };
+                graphData.layout.xaxis = { 
+                    ...graphData.layout.xaxis, 
+                    gridcolor: '#e5e5e5', 
+                    linecolor: '#1a1a1a',
+                    linewidth: 2,
+                    showgrid: true,
+                    zeroline: false
+                };
+                graphData.layout.yaxis = { 
+                    ...graphData.layout.yaxis, 
+                    gridcolor: '#e5e5e5', 
+                    linecolor: '#1a1a1a',
+                    linewidth: 2,
+                    showgrid: true,
+                    zeroline: false
+                };
+
+                // Updating traces for visibility on light background
+                if(graphData.data) {
+                    graphData.data.forEach(trace => {
+                        if(trace.name && trace.name.toLowerCase().includes('actual')) trace.line = { ...trace.line, color: '#1a1a1a', width: 3 };
+                        if(trace.name && trace.name.toLowerCase().includes('rf')) trace.line = { ...trace.line, color: '#D1110B', dash: 'dot' };
+                        if(trace.name && trace.name.toLowerCase().includes('lstm')) trace.line = { ...trace.line, color: '#0047AB', width: 4 };
+                    });
+                }
+
+                Plotly.newPlot('plotlyChart', graphData.data, graphData.layout, { responsive: true, displayModeBar: false });
+
+                dash.style.opacity = '1';
+            } catch (err) {
+                welcome.className = "premium-card p-12 text-center text-red-600 border-red-600 bg-red-50 font-bold";
+                welcome.innerText = "Pipeline Error: " + err.message;
+                welcome.classList.remove('hidden');
+                dash.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
